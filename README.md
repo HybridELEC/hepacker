@@ -8,9 +8,16 @@ This tool expects the following tool & binaries to exist in `PATH` and being the
 
 - `ampart`: from https://github.com/7Ji/ampart , for modifying the partition table in DTB
 - `ampack`: from https://github.com/7Ji/ampack , for unpacking and repacking burning image
+- `mkimage`: provided by `uboot-tools`, for creating uboot script
 - `mkfs.vfat`: provided by `dosfstools`, for creating fat32 filesystems for `ce_system` and `ee_system`
+- `mcopy`: provided by `mtools`, for pre-populating fat32 filesystems
 - `mkfs.ext4`: provided by `e2fsprogs`, for creating ext4 filesystems for `ce_storage` and `ee_storage`
 - `img2simg`: provides by `android-tools`, for converting raw partition files to sparse partition files
+
+On Arch Linux, install the above dependencies with the following command:
+```
+sudo pacman -Syu uboot-tools dosfstools mtools e2fsprogs android-tools
+```
 
 ## Usage
 ```
