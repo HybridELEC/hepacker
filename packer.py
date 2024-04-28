@@ -7,20 +7,6 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 
-# setenv rootopt "BOOT_IMAGE=kernel.img boot=/dev/ce_system disk=/dev/ce_storage"
-
-# #------------------------------------------------------------------------------------------------------
-# #
-# # HybridELEC specific logic: DTB selection
-# #
-# # should be the name (without .dtb extension) of a file under device_trees
-# #
-# device_tree=sc2_s905x4_4g_1gbit
-# #
-# #------------------------------------------------------------------------------------------------------
-
-# We don't want the first 0x48 bytes
-
 @dataclass
 class Args:
     base_image: str
