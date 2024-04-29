@@ -21,7 +21,7 @@ sudo pacman -Syu uboot-tools dosfstools mtools e2fsprogs android-tools
 
 ## Usage
 ```
-python packer.py [base image] [ce tar] [ce dtb] [ce storage size] [ee tar] [ee dtb] [ee storage size] [output image]
+python hepacker.py [base image] [ce tar] [ce dtb] [ce storage size] [ee tar] [ee dtb] [ee storage size] [output image]
 ```
 - `[base image]`: The path to the base Android Amlogic Bunring Image
   - It must be the original Android image, without CE/EE embedded.
@@ -40,7 +40,7 @@ python packer.py [base image] [ce tar] [ce dtb] [ce storage size] [ee tar] [ee d
 - `[ee dtb]`: The name of EmuELEC DTB
   - It shall not contain the `.dtb` suffix
   - E.g. `sc2_s905x4_4g_1gbit`
-- `[ce storage size]`: The size of EmuELEC storage partition
+- `[ee storage size]`: The size of EmuELEC storage partition
   - It shall be a valid argument for both `mkfs.ext4 -s` and `ampart --mode dclone`
   - E.g. `4G`
 - `[output image]`: The path to the output Android Amlogic Burning Image
