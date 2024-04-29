@@ -104,7 +104,7 @@ class UpgradeTar:
                     self.name.upper().encode('utf-8'),
                     b') on eMMC"')))
             elif segment.startswith(b'setenv rootopt "BOOT_IMAGE=kernel.img boot=LABEL='):
-                cfgload_segments.append(f'setenv rootopt "BOOT_IMAGE=kernel.img boot=/dev/{self.name}_system disk=/dev/{self.name}_storage'.encode('utf-8'))
+                cfgload_segments.append(f'setenv rootopt "BOOT_IMAGE=kernel.img boot=/dev/{self.name}_system disk=/dev/{self.name}_storage"'.encode('utf-8'))
             elif segment.startswith(b'if test "${ce_on_emmc}" = "yes"; then setenv rootopt "BOOT_IMAGE=kernel.img boot=LABEL=CE_FLASH disk=FOLDER=/dev/CE_STORAGE"; fi'):
                 pass
             elif segment.startswith(b'fatload ${device} ${devnr}:${partnr} ${dtb_mem_addr} dtb.img'):
@@ -246,7 +246,11 @@ def main():
     dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
     if dtb_dup.exists():
         shutil.copyfile(dtb, dtb_dup)
-    subprocess.run(("ampack", "pack", everything, args.output_image), check = True)
+    if everything.joinpath("super.PARTITION").exists() and any(True for _ in everything.glob("*_a.PARTITION")):
+        pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output_image)
+    else:
+        pack_args = ("ampack", "pack", everything, args.output_image)
+    subprocess.run(pack_args, check = True)
 
 if __name__ == '__main__':
     main()
