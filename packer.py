@@ -214,6 +214,10 @@ class AmpartTable:
         partitions.append(AmpartPartition("ce_storage", ce_storage_size, 4))
         partitions.append(AmpartPartition("ee_storage", ee_storage_size, 4))
         partitions.append(self.partitions[-1])
+        if len(partitions) > 28: # Too many, remove _b partitions
+            partitions = [partition for partition in partitions if not partition.name.endswith("_b")]
+            if len(partitions) > 28:
+                raise Exception("Too many partitions")
         self.partitions = partitions
 
 def size_from_human_readable(size: str) -> int:
