@@ -229,6 +229,32 @@ def size_from_human_readable(size: str) -> int:
     }
     return int(size[:-1]) * suffix_map[size[-1]]
 
+def hack_recovery(building: Building):
+    recovery_partition = building.everything().joinpath("recovery.PARTITION")
+    if not recovery_partition.exists():
+        return
+    with recovery_partition.open('rb') as f:
+        magic = f.read(8)
+        if magic != b'ANDROID!':
+            return
+        f.seek(0x40)
+        cmdline = f.read(0x200)
+    cmdline = cmdline.strip()
+    cmdline_parts = []
+    for part in cmdline.split(b' '):
+        if len(part) == 0:
+            continue
+        elif part.startswith(b'root=/dev/mmcblk0p'):
+            part_id = int(part[18:])
+            part = f"root=/dev/mmcblk0p{part_id + 2}".encode('utf-8')
+        cmdline_parts.append(part)
+    cmdline = b' '.join(cmdline_parts)
+    cmdline += b'\0' * (0x200 - len(cmdline))
+    with recovery_partition.open('rb+') as f:
+        f.seek(0x40)
+        len_written = f.write(cmdline)
+    if len_written != 0x200:
+        raise Exception("Written bytes length is not 0x200")
 
 def main():
     argv = sys.argv
@@ -241,7 +267,7 @@ def main():
     ce_system_size, ce_storage_size = ce_tar.build(building, size_from_human_readable(args.ce_storage_size))
     ee_tar = UpgradeTar("ee", args.ee_tar, args.ee_dtb)
     ee_system_size, ee_storage_size = ee_tar.build(building, size_from_human_readable(args.ee_storage_size))
-    # everything = pathlib.Path("building/everything")
+    hack_recovery(building)
     dtb = everything.joinpath("meson1.dtb")
     r = subprocess.run(("ampart", "--mode", "dsnapshot", dtb), check = True, stdout = subprocess.PIPE)
     table = AmpartTable.from_line(r.stdout.decode("utf-8").split("\n")[0])
