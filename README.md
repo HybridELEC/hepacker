@@ -17,6 +17,7 @@ This tool expects the following tool & binaries to exist in `PATH` and being the
 On Arch Linux, install the above dependencies with the following command:
 ```
 sudo pacman -Syu uboot-tools dosfstools mtools e2fsprogs android-tools
+yay -S ampart-git ampack-git
 ```
 
 ## Usage
