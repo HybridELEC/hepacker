@@ -1,5 +1,5 @@
 # HybridELEC packer
-A tool to create HybridELEC Android + CE + EE 3in1 burning image.
+A tool to create HybridELEC Android + CE + EE 3in1 burning image, Android + CE 2in1 burning image, and Android + EE 2in1 burning image.
 
 ## Dependencies
 The platform on which this tool is developed and tested is Arch Linux.
