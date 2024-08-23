@@ -22,27 +22,36 @@ yay -S ampart-git ampack-git
 
 ## Usage
 ```
-python hepacker.py [base image] [ce tar] [ce dtb] [ce storage size] [ee tar] [ee dtb] [ee storage size] [output image]
+python hepacker.py [-h] --android ANDROID [--ce-tar CE_TAR] [--ce-dtb CE_DTB] [--ce-storage CE_STORAGE] [--ee-tar EE_TAR] [--ee-dtb EE_DTB] [--ee-storage EE_STORAGE] [--building BUILDING] --output OUTPUT
+
+options:
+  -h, --help            show this help message and exit
+  --android ANDROID     path to base Android image, it must not contain embedded CE nor EE
+  --ce-tar CE_TAR       path to CoreELEC upgrade tar, setting this enables embedding CE, requiring --ce-dtb and --ce-storage
+  --ce-dtb CE_DTB       name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit
+  --ce-storage CE_STORAGE
+                        size of CoreELEC storage partition, e.g. 1G
+  --ee-tar EE_TAR       path to EmuELEC upgrade tar, setting this enables embedding EE, requiring --ee-dtb and --ee-storage
+  --ee-dtb EE_DTB       name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit
+  --ee-storage EE_STORAGE
+                        size of EmuELEC storage partition, e.g. 1G
+  --building BUILDING   path to building folder, would be removed if it already exists, default: building
+  --output OUTPUT       path to output image
 ```
-- `[base image]`: The path to the base Android Amlogic Bunring Image
-  - It must be the original Android image, without CE/EE embedded.
-  - It must not be compressed
-  - E.g. `~/Downloads/ah218.VONTAR_X4_1000M_11.2023.01.05.02.55.img`
-- `[ce tar]`: The path to CoreELEC upgrade tar
-  - E.g. `~/Downloads/CoreELEC-Amlogic-ne.aarch64-21.0-Omega.tar`
-- `[ce dtb]`: The name of CoreELEC DTB
-  - It shall not contain the `.dtb` suffix
-  - E.g. `sc2_s905x4_4g_1gbit`
-- `[ce storage size]`: The size of CoreELEC storage partition
-  - It shall be a valid argument for both `mkfs.ext4 -s` and `ampart --mode dclone`
-  - E.g. `1G`
-- `[ee tar]`: The path to EmuELEC upgrade tar
-  - E.g. `~/Downloads/EmuELEC-Amlogic-ng.aarch64-4.7.tar`
-- `[ee dtb]`: The name of EmuELEC DTB
-  - It shall not contain the `.dtb` suffix
-  - E.g. `sc2_s905x4_4g_1gbit`
-- `[ee storage size]`: The size of EmuELEC storage partition
-  - It shall be a valid argument for both `mkfs.ext4 -s` and `ampart --mode dclone`
-  - E.g. `4G`
-- `[output image]`: The path to the output Android Amlogic Burning Image
-  - E.g. `HybridELEC_sc2_s905x4_ah212_HK1_Rbox-X4_1000M_Android-11.0-2022.03.05.13.49_CoreELEC-20.0-ne_EmuELEC-v4.6-ng.img`
+
+Examples:
+
+- Build Android + CoreELEC + EmuELEC 3-in-1 image
+  ````
+  python hepacker.py --android ~/Downloads/aml_upgrade_package_senk.img --ce-tar ~/Downloads/CoreELEC-Amlogic-ng.arm-21.0-Omega.tar --ce-dtb g12a_s905x2_4g --ce-storage 1G --ee-tar ~/Downloads/EmuELEC-Amlogic-ng.aarch64-4.7.tar --ee-dtb g12a_s905x2_4g --ee-storage 4G --output a95x_f2_hybrid_ACE.img
+  ````
+
+- Build Android + CoreELEC 2-in-1 image
+  ````
+  python hepacker.py --android ~/Downloads/aml_upgrade_package_senk.img --ce-tar ~/Downloads/CoreELEC-Amlogic-ng.arm-21.0-Omega.tar --ce-dtb g12a_s905x2_4g --ce-storage 1G --output a95x_f2_hybrid_AC.img
+  ````
+
+- Build Android + EmuELEC 2-in-1 image
+  ````
+  python hepacker.py --android ~/Downloads/aml_upgrade_package_senk.img --ee-tar ~/Downloads/EmuELEC-Amlogic-ng.aarch64-4.7.tar --ee-dtb g12a_s905x2_4g --ee-storage 4G --output a95x_f2_hybrid_AE.img
+  ````

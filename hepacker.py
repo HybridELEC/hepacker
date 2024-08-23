@@ -5,18 +5,8 @@ import hashlib
 import pathlib
 import shutil
 import subprocess
+import argparse
 from dataclasses import dataclass
-
-@dataclass
-class Args:
-    base_image: str
-    ce_tar: str
-    ce_dtb: str
-    ce_storage_size: str
-    ee_tar: str
-    ee_dtb: str
-    ee_storage_size: str
-    output_image: str
 
 @dataclass
 class UpgradeTarInfo:
@@ -40,7 +30,6 @@ def verify_md5(data: bytes, md5sum_expected: bytes):
     md5sum_calculated = hashlib.md5(data).digest()
     if md5sum_calculated != md5sum_expected:
         raise Exception(f"MD5 sum is not right, calculated {md5sum_calculated} != expected {md5sum_expected}")
-
 
 @dataclass
 class Building:
@@ -179,6 +168,40 @@ class UpgradeTar:
             self.build_storage(building, storage_size)
         )
 
+
+def size_from_human_readable(size: str) -> int:
+    suffix_map = {
+        'B': 1,
+        'K': 0x400,
+        'M': 0x100000,
+        'G': 0x40000000
+    }
+    return int(size[:-1]) * suffix_map[size[-1]]
+
+@dataclass
+class SubsystemOptions:
+    tar: str
+    dtb: str
+    system: int
+    storage: int
+
+    @classmethod
+    def from_args(cls, tar: str, dtb: str, storage: str):
+        if tar is None:
+            return None
+        elif dtb is None:
+            raise ValueError("DTB must be set when tar is set")
+        elif storage is None:
+            raise ValueError("storaget size must be set when tar is set")
+        else:
+            return cls(tar, dtb, 0, size_from_human_readable(storage))
+
+    def build_tar(self, tar: UpgradeTar, building: Building):
+        self.system, self.storage = tar.build(building, self.storage)
+
+    def build(self, name: str, building: Building):
+        self.build_tar(UpgradeTar(name, self.tar, self.dtb), building)
+
 @dataclass
 class AmpartPartition:
     name: str
@@ -205,29 +228,23 @@ class AmpartTable:
         partitions = [AmpartPartition.from_parg(line_part) for line_part in line_parts]
         return cls(partitions, len(partitions))
 
-    def update(self, ce_system_size: int, ee_system_size: int, ce_storage_size: int, ee_storage_size: int):
-        partitions = [
-            AmpartPartition("ce_system", ce_system_size, 2),
-            AmpartPartition("ee_system", ee_system_size, 2)
-        ]
+    def update(self, ce_options: SubsystemOptions, ee_options: SubsystemOptions):
+        partitions = []
+        if ce_options is not None:
+            partitions.append(AmpartPartition("ce_system", ce_options.system, 2))
+        if ee_options is not None:
+            partitions.append(AmpartPartition("ee_system", ee_options.system, 2))
         partitions.extend(self.partitions[:-1])
-        partitions.append(AmpartPartition("ce_storage", ce_storage_size, 4))
-        partitions.append(AmpartPartition("ee_storage", ee_storage_size, 4))
+        if ce_options is not None:
+            partitions.append(AmpartPartition("ce_storage", ce_options.storage, 4))
+        if ee_options is not None:
+            partitions.append(AmpartPartition("ee_storage", ee_options.storage, 4))
         partitions.append(self.partitions[-1])
         if len(partitions) > 28: # Too many, remove _b partitions
             partitions = [partition for partition in partitions if not partition.name.endswith("_b")]
             if len(partitions) > 28:
                 raise Exception("Too many partitions")
         self.partitions = partitions
-
-def size_from_human_readable(size: str) -> int:
-    suffix_map = {
-        'B': 1,
-        'K': 0x400,
-        'M': 0x100000,
-        'G': 0x40000000
-    }
-    return int(size[:-1]) * suffix_map[size[-1]]
 
 def hack_recovery(building: Building):
     recovery_partition = building.everything().joinpath("recovery.PARTITION")
@@ -258,28 +275,42 @@ def hack_recovery(building: Building):
 
 def main():
     argv = sys.argv
-    args = Args(argv[1], argv[2], argv[3], argv[4], argv[5], argv[6], argv[7], argv[8])
-    building = Building(pathlib.Path("building"))
+    parser = argparse.ArgumentParser(prog='hepacker')
+    parser.add_argument('--android', help='path to base Android image, it must not contain embedded CE nor EE', required=True)
+    parser.add_argument('--ce-tar', help='path to CoreELEC upgrade tar, setting this enables embedding CE, requiring --ce-dtb and --ce-storage')
+    parser.add_argument('--ce-dtb', help='name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
+    parser.add_argument('--ce-storage', help='size of CoreELEC storage partition, e.g. 1G')
+    parser.add_argument('--ee-tar', help='path to EmuELEC upgrade tar, setting this enables embedding EE, requiring --ee-dtb and --ee-storage')
+    parser.add_argument('--ee-dtb', help='name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
+    parser.add_argument('--ee-storage', help='size of EmuELEC storage partition, e.g. 1G')
+    parser.add_argument('--building', help='path to building folder, would be removed if it already exists, default: building', default='building')
+    parser.add_argument('--output', help='path to output image', required=True)
+    args = parser.parse_args()
+    ce_options = SubsystemOptions.from_args(args.ce_tar, args.ce_dtb, args.ce_storage)
+    ee_options = SubsystemOptions.from_args(args.ee_tar, args.ee_dtb, args.ee_storage)
+    if ce_options is None and ee_options is None:
+        raise ValueError("Neither CoreELEC or EmuELEC to be embedded, check your options")
+    building = Building(pathlib.Path(args.building))
     shutil.rmtree(building.building, True)
     everything = building.everything()
-    subprocess.run(("ampack", "unpack", args.base_image, everything), check = True)
-    ce_tar = UpgradeTar("ce", args.ce_tar, args.ce_dtb)
-    ce_system_size, ce_storage_size = ce_tar.build(building, size_from_human_readable(args.ce_storage_size))
-    ee_tar = UpgradeTar("ee", args.ee_tar, args.ee_dtb)
-    ee_system_size, ee_storage_size = ee_tar.build(building, size_from_human_readable(args.ee_storage_size))
+    subprocess.run(("ampack", "unpack", args.android, everything), check = True)
+    if ce_options is not None:
+        ce_options.build("ce", building)
+    if ee_options is not None:
+        ee_options.build("ee", building)
     hack_recovery(building)
     dtb = everything.joinpath("meson1.dtb")
     r = subprocess.run(("ampart", "--mode", "dsnapshot", dtb), check = True, stdout = subprocess.PIPE)
     table = AmpartTable.from_line(r.stdout.decode("utf-8").split("\n")[0])
-    table.update(ce_system_size, ee_system_size, ce_storage_size, ee_storage_size)
+    table.update(ce_options, ee_options)
     subprocess.run(("ampart", "--mode", "dclone", dtb, *(f"{partition.name}::{partition.size}:{partition.masks}" for partition in table.partitions)))
     dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
     if dtb_dup.exists():
         shutil.copyfile(dtb, dtb_dup)
     if everything.joinpath("super.PARTITION").exists() and any(True for _ in everything.glob("*_a.PARTITION")):
-        pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output_image)
+        pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output)
     else:
-        pack_args = ("ampack", "pack", everything, args.output_image)
+        pack_args = ("ampack", "pack", everything, args.output)
     subprocess.run(pack_args, check = True)
 
 if __name__ == '__main__':
