@@ -1,3 +1,6 @@
+----
+SPDX-License-Identifier: AGPL-3.0-or-later
+----
 # HybridELEC packer
 A tool to create HybridELEC Android + CE + EE 3in1 burning image, Android + CE 2in1 burning image, and Android + EE 2in1 burning image.
 

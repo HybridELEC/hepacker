@@ -1,3 +1,6 @@
+----
+SPDX-License-Identifier: AGPL-3.0-or-later
+----
 The project is at https://github.com/HybridELEC/hepacker , some of the images for devices I personally own are available at https://github.com/HybridELEC/HybridELEC
 
 As long as you have a stock Android USB burning image for your amlogic-ng or amlogic-ne device then this should work. you just need that Android image, the latest CoreELEC upgrade tarball for the version of CE that verifies to work on your device, and the latest EmuELEC upgrade tarball for the version of EE that verifies to work on your device. Follow the project README and specify the DTB names and size of CE and EE storage paritions, and you should get a USB burning image. 
