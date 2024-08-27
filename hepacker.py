@@ -302,6 +302,9 @@ def hack_recovery(building: Building):
     if len_written != 0x200:
         raise Exception("Written bytes length is not 0x200")
 
+def fake_emmc():
+    pass
+
 def main():
     argv = sys.argv
     parser = argparse.ArgumentParser(prog='hepacker', epilog='''
@@ -318,6 +321,7 @@ def main():
     parser.add_argument('--ee-storage', help='size of EmuELEC storage partition, e.g. 1G; needed alongside --ee-tar')
     parser.add_argument('--keep', nargs='+', help='partition file(s) you would want to keep, multiple args can be followed, by keeping only the bare minimum you essentially keep the Android pre-booting environment but remove the Android system and the disk space occupied by them, so the installation would be CE/EE only, in that case an external CoreELEC/EmuELEC boot is needed before the eMMC CE/EE is bootable, the parts set is box-specific and newer boxes need more parts to boot, you are recommended to go from a full list (with a manual ampack unpack and set all unpacked parts) and drop one by one to find the minimum list, e.g. UBOOT.USB UBOOT.ENC')
     parser.add_argument('--building', help='path to building folder, would be removed if it already exists, default: building', default='building')
+    parser.add_argument('--fake-emmc', help='(WIP) exact size of a fake eMMC to "install" to, the --output would not be a burning image, but an eMMC image',)
     parser.add_argument('--output', help='path to output image', required=True)
     args = parser.parse_args()
     ce_options = SubsystemOptions.from_args(args.ce_tar, args.ce_dtb, args.ce_system, args.ce_storage)
@@ -328,7 +332,8 @@ def main():
     shutil.rmtree(building.building, True)
     everything = building.everything()
     subprocess.run(("ampack", "unpack", args.android, everything), check = True)
-    building.check_encrypt()
+    if args.fake_emmc is None:
+        building.check_encrypt()
     if args.keep is not None:
         building.keep(args.keep)
     if ce_options is not None:
@@ -341,14 +346,19 @@ def main():
     table = AmpartTable.from_line(r.stdout.decode("utf-8").split("\n")[0])
     table.update(ce_options, ee_options)
     subprocess.run(("ampart", "--mode", "dclone", dtb, *(f"{partition.name}::{partition.size}:{partition.masks}" for partition in table.partitions)))
-    dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
-    if dtb_dup.exists():
-        shutil.copyfile(dtb, dtb_dup)
-    if everything.joinpath("super.PARTITION").exists() and any(True for _ in everything.glob("*_a.PARTITION")):
-        pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output)
+    if args.fake_emmc is None:
+        dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
+        if dtb_dup.exists():
+            shutil.copyfile(dtb, dtb_dup)
+        if everything.joinpath("super.PARTITION").exists() and any(True for _ in everything.glob("*_a.PARTITION")):
+            pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output)
+        else:
+            pack_args = ("ampack", "pack", everything, args.output)
+        subprocess.run(pack_args, check = True)
     else:
-        pack_args = ("ampack", "pack", everything, args.output)
-    subprocess.run(pack_args, check = True)
+        print("Doing a fake eMMC installation")
+
+
 
 if __name__ == '__main__':
     main()
