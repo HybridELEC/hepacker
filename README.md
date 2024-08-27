@@ -4,6 +4,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 # HybridELEC packer
 A tool to create HybridELEC Android + CE + EE 3in1 burning image, Android + CE 2in1 burning image, and Android + EE 2in1 burning image.
 
+You're free to redistribute the generated image, but be sure not to violate the EULA of your Android image provider. Be extra careful if you build from a third party Android ROM, as most ROM makers are not happy for re-modification of their ROMs.
+
 ## Dependencies
 The platform on which this tool is developed and tested is Arch Linux.
 
