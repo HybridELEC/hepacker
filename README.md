@@ -27,7 +27,7 @@ yay -S ampart-git ampack-git
 
 ## Usage
 ```
-python hepacker.py [-h] --android ANDROID [--ce-tar CE_TAR] [--ce-dtb CE_DTB] [--ce-storage CE_STORAGE] [--ee-tar EE_TAR] [--ee-dtb EE_DTB] [--ee-storage EE_STORAGE] [--building BUILDING] --output OUTPUT
+python hepacker.py [-h] --android ANDROID [--ce-tar CE_TAR] [--ce-dtb CE_DTB] [--ce-storage CE_STORAGE] [--ee-tar EE_TAR] [--ee-dtb EE_DTB] [--ee-storage EE_STORAGE] [--keep KEEP [KEEP ...]] [--building BUILDING] --output OUTPUT
 
 options:
   -h, --help            show this help message and exit
@@ -40,8 +40,14 @@ options:
   --ee-dtb EE_DTB       name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit
   --ee-storage EE_STORAGE
                         size of EmuELEC storage partition, e.g. 1G
+  --keep KEEP [KEEP ...]
+                        partition file(s) you would want to keep, multiple args can be followed, by keeping only the bare minimum you essentially keep the Android pre-booting environment but remove the Android system and the disk space
+                        occupied by them, so the installation would be CE/EE only, in that case an external CoreELEC/EmuELEC boot is needed before the eMMC CE/EE is bootable, the parts set is box-specific and newer boxes need more parts to
+                        boot, you are recommended to go from a full list (with a manual ampack unpack and set all unpacked parts) and drop one by one to find the minimum list, e.g. UBOOT.USB UBOOT.ENC
   --building BUILDING   path to building folder, would be removed if it already exists, default: building
   --output OUTPUT       path to output image
+
+Note: --android is always needed (Android); with --ce-tar = embedding CoreELEC (+CoreELEC); with --ee-tar = embedding EmuELEC (+EmuELEC); with box-specific --keep = dropping Android system (-Android)
 ```
 
 Examples:

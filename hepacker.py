@@ -39,6 +39,15 @@ class Building:
     def everything(self) -> pathlib.Path:
         return self.building.joinpath("everything")
 
+    def keep(self, parts: list):
+        print(f"Keeping only the following parts in base Android image: {parts}")
+        for path in self.everything().glob('*'):
+            if path.name in parts:
+                print(f"+ {path}")
+                continue
+            print(f"- {path}")
+            path.unlink()
+
 def upper_megabyte(size: int) -> int:
     return (size + 0xfffff) // 0x100000 * 0x100000
 
@@ -276,7 +285,9 @@ def hack_recovery(building: Building):
 
 def main():
     argv = sys.argv
-    parser = argparse.ArgumentParser(prog='hepacker')
+    parser = argparse.ArgumentParser(prog='hepacker', epilog='''
+        Note: --android is always needed (Android); with --ce-tar = embedding CoreELEC (+CoreELEC); with --ee-tar = embedding EmuELEC (+EmuELEC); with box-specific --keep = dropping Android system (-Android)
+    ''')
     parser.add_argument('--android', help='path to base Android image, it must not contain embedded CE nor EE', required=True)
     parser.add_argument('--ce-tar', help='path to CoreELEC upgrade tar, setting this enables embedding CE, requiring --ce-dtb and --ce-storage')
     parser.add_argument('--ce-dtb', help='name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
@@ -284,6 +295,7 @@ def main():
     parser.add_argument('--ee-tar', help='path to EmuELEC upgrade tar, setting this enables embedding EE, requiring --ee-dtb and --ee-storage')
     parser.add_argument('--ee-dtb', help='name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
     parser.add_argument('--ee-storage', help='size of EmuELEC storage partition, e.g. 1G')
+    parser.add_argument('--keep', nargs='+', help='partition file(s) you would want to keep, multiple args can be followed, by keeping only the bare minimum you essentially keep the Android pre-booting environment but remove the Android system and the disk space occupied by them, so the installation would be CE/EE only, in that case an external CoreELEC/EmuELEC boot is needed before the eMMC CE/EE is bootable, the parts set is box-specific and newer boxes need more parts to boot, you are recommended to go from a full list (with a manual ampack unpack and set all unpacked parts) and drop one by one to find the minimum list, e.g. UBOOT.USB UBOOT.ENC')
     parser.add_argument('--building', help='path to building folder, would be removed if it already exists, default: building', default='building')
     parser.add_argument('--output', help='path to output image', required=True)
     args = parser.parse_args()
@@ -295,6 +307,8 @@ def main():
     shutil.rmtree(building.building, True)
     everything = building.everything()
     subprocess.run(("ampack", "unpack", args.android, everything), check = True)
+    if args.keep is not None:
+        building.keep(args.keep)
     if ce_options is not None:
         ce_options.build("ce", building)
     if ee_options is not None:
