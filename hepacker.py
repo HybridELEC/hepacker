@@ -88,7 +88,7 @@ class UpgradeTar:
         self.name = name
         self.dtb = dtb
 
-    def build_system(self, building: Building) -> int:
+    def build_system(self, building: Building, system_dynamic: bool, system_size: int) -> int:
         everything = building.everything()
         system_stem = f"{self.name}_system"
         system_content = building.building.joinpath(system_stem)
@@ -148,12 +148,16 @@ class UpgradeTar:
         with device_trees.joinpath(f"{self.dtb}.dtb").open('wb') as f:
             f.write(self.data.dtb)
         # the whole system partition
-        size = len(cfgload) + 0x48 + len(config) + len(self.data.kernel) + len(self.data.system) + len(self.data.dtb)
-        size_partition_least = upper_megabyte(size)
+        if system_dynamic:
+            size = len(cfgload) + 0x48 + len(config) + len(self.data.kernel) + len(self.data.system) + len(self.data.dtb)
+            size_partition_least = upper_megabyte(size) + 2 * 0x100000 + system_size
+        else:
+            size_partition_least = system_size
         system_partition = everything.joinpath(f"{system_stem}.PARTITION")
         # Brute force to find minimum size
-        for oversize in range(2, 10):
+        for oversize in range(0, 10):
             size_partition = size_partition_least + oversize * 0x100000
+            print(f"Trying system partition size: {size_partition // 0x100000}M")
             allocate_file(system_partition, size_partition)
             subprocess.run(("mkfs.vfat", "-F", "32", "-n", f"HYBRID_{self.name[0].upper()}SYS", system_partition))
             r = subprocess.run(("mcopy", "-svi", system_partition, cfgload_uscript, config_ini, kernel_img, system_img, device_trees, "::"))
@@ -172,9 +176,9 @@ class UpgradeTar:
         storage_raw.unlink()
         return storage_size
 
-    def build(self, building: Building, storage_size: int) -> (int, int):
+    def build(self, building: Building, system_dynamic: bool, system_size: int, storage_size: int) -> (int, int):
         return (
-            self.build_system(building),
+            self.build_system(building, system_dynamic, system_size),
             self.build_storage(building, storage_size)
         )
 
@@ -192,11 +196,12 @@ def size_from_human_readable(size: str) -> int:
 class SubsystemOptions:
     tar: str
     dtb: str
-    system: int
+    system_dynamic: bool
+    system_size: int
     storage: int
 
     @classmethod
-    def from_args(cls, tar: str, dtb: str, storage: str):
+    def from_args(cls, tar: str, dtb: str, system: str, storage: str):
         if tar is None:
             return None
         elif dtb is None:
@@ -204,10 +209,20 @@ class SubsystemOptions:
         elif storage is None:
             raise ValueError("storaget size must be set when tar is set")
         else:
-            return cls(tar, dtb, 0, size_from_human_readable(storage))
+            if system is None:
+                system_dynamic = True
+                system_size = 0
+            elif system[0] == '+':
+                print(system)
+                system_dynamic = True
+                system_size = size_from_human_readable(system[1:])
+            else:
+                system_dynamic = False
+                system_size = size_from_human_readable(system)
+            return cls(tar, dtb, system_dynamic, system_size, size_from_human_readable(storage))
 
     def build_tar(self, tar: UpgradeTar, building: Building):
-        self.system, self.storage = tar.build(building, self.storage)
+        self.system, self.storage = tar.build(building, self.system_dynamic, self.system_size, self.storage)
 
     def build(self, name: str, building: Building):
         self.build_tar(UpgradeTar(name, self.tar, self.dtb), building)
@@ -290,17 +305,19 @@ def main():
     ''')
     parser.add_argument('--android', help='path to base Android image, it must not contain embedded CE nor EE', required=True)
     parser.add_argument('--ce-tar', help='path to CoreELEC upgrade tar, setting this enables embedding CE, requiring --ce-dtb and --ce-storage')
-    parser.add_argument('--ce-dtb', help='name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
-    parser.add_argument('--ce-storage', help='size of CoreELEC storage partition, e.g. 1G')
+    parser.add_argument('--ce-dtb', help='name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit; needed alongside --ce-tar')
+    parser.add_argument('--ce-system', help='size of CoreELEC system partition, e.g. 200M, or with + for free space needed to calculate the size dynamically, e.g. +100M, by default it is +0M; dynamic or not, hepacker would always try from set/estimated size +0M to +10M before it gives up for the size, so an e.g. 256M size could result in 266M')
+    parser.add_argument('--ce-storage', help='size of CoreELEC storage partition, e.g. 1G; needed alongside --ce-tar')
     parser.add_argument('--ee-tar', help='path to EmuELEC upgrade tar, setting this enables embedding EE, requiring --ee-dtb and --ee-storage')
-    parser.add_argument('--ee-dtb', help='name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit')
-    parser.add_argument('--ee-storage', help='size of EmuELEC storage partition, e.g. 1G')
+    parser.add_argument('--ee-dtb', help='name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit; needed alongside --ee-tar')
+    parser.add_argument('--ee-system', help='size of EmuELEC system partition, e.g. 2G, or with + for free space needed to calculate the size dynamically, e.g. +100M, by default it is +0M; dynamic or not, hepacker would always try from set/estimated size +0M to +10M before it gives up for the size, so an e.g. 2G size could result in 2058M')
+    parser.add_argument('--ee-storage', help='size of EmuELEC storage partition, e.g. 1G; needed alongside --ee-tar')
     parser.add_argument('--keep', nargs='+', help='partition file(s) you would want to keep, multiple args can be followed, by keeping only the bare minimum you essentially keep the Android pre-booting environment but remove the Android system and the disk space occupied by them, so the installation would be CE/EE only, in that case an external CoreELEC/EmuELEC boot is needed before the eMMC CE/EE is bootable, the parts set is box-specific and newer boxes need more parts to boot, you are recommended to go from a full list (with a manual ampack unpack and set all unpacked parts) and drop one by one to find the minimum list, e.g. UBOOT.USB UBOOT.ENC')
     parser.add_argument('--building', help='path to building folder, would be removed if it already exists, default: building', default='building')
     parser.add_argument('--output', help='path to output image', required=True)
     args = parser.parse_args()
-    ce_options = SubsystemOptions.from_args(args.ce_tar, args.ce_dtb, args.ce_storage)
-    ee_options = SubsystemOptions.from_args(args.ee_tar, args.ee_dtb, args.ee_storage)
+    ce_options = SubsystemOptions.from_args(args.ce_tar, args.ce_dtb, args.ce_system, args.ce_storage)
+    ee_options = SubsystemOptions.from_args(args.ee_tar, args.ee_dtb, args.ee_system, args.ee_storage)
     if ce_options is None and ee_options is None:
         raise ValueError("Neither CoreELEC or EmuELEC to be embedded, check your options")
     building = Building(pathlib.Path(args.building))

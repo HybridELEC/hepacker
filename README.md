@@ -27,19 +27,26 @@ yay -S ampart-git ampack-git
 
 ## Usage
 ```
-python hepacker.py [-h] --android ANDROID [--ce-tar CE_TAR] [--ce-dtb CE_DTB] [--ce-storage CE_STORAGE] [--ee-tar EE_TAR] [--ee-dtb EE_DTB] [--ee-storage EE_STORAGE] [--keep KEEP [KEEP ...]] [--building BUILDING] --output OUTPUT
+python hepacker.py [-h] --android ANDROID [--ce-tar CE_TAR] [--ce-dtb CE_DTB] [--ce-system CE_SYSTEM] [--ce-storage CE_STORAGE] [--ee-tar EE_TAR] [--ee-dtb EE_DTB] [--ee-system EE_SYSTEM] [--ee-storage EE_STORAGE] [--keep KEEP [KEEP ...]]
+                [--building BUILDING] --output OUTPUT
 
 options:
   -h, --help            show this help message and exit
   --android ANDROID     path to base Android image, it must not contain embedded CE nor EE
   --ce-tar CE_TAR       path to CoreELEC upgrade tar, setting this enables embedding CE, requiring --ce-dtb and --ce-storage
-  --ce-dtb CE_DTB       name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit
+  --ce-dtb CE_DTB       name of CoreELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit; needed alongside --ce-tar
+  --ce-system CE_SYSTEM
+                        size of CoreELEC system partition, e.g. 200M, or with + for free space needed to calculate the size dynamically, e.g. +100M, by default it is +0M; dynamic or not, hepacker would always try from set/estimated size +0M
+                        to +10M before it gives up for the size, so an e.g. 256M size could result in 266M
   --ce-storage CE_STORAGE
-                        size of CoreELEC storage partition, e.g. 1G
+                        size of CoreELEC storage partition, e.g. 1G; needed alongside --ce-tar
   --ee-tar EE_TAR       path to EmuELEC upgrade tar, setting this enables embedding EE, requiring --ee-dtb and --ee-storage
-  --ee-dtb EE_DTB       name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit
+  --ee-dtb EE_DTB       name of EmuELEC DTB, without .dtb suffix, e.g. sc2_s905x4_4g_1gbit; needed alongside --ee-tar
+  --ee-system EE_SYSTEM
+                        size of EmuELEC system partition, e.g. 2G, or with + for free space needed to calculate the size dynamically, e.g. +100M, by default it is +0M; dynamic or not, hepacker would always try from set/estimated size +0M to
+                        +10M before it gives up for the size, so an e.g. 2G size could result in 2058M
   --ee-storage EE_STORAGE
-                        size of EmuELEC storage partition, e.g. 1G
+                        size of EmuELEC storage partition, e.g. 1G; needed alongside --ee-tar
   --keep KEEP [KEEP ...]
                         partition file(s) you would want to keep, multiple args can be followed, by keeping only the bare minimum you essentially keep the Android pre-booting environment but remove the Android system and the disk space
                         occupied by them, so the installation would be CE/EE only, in that case an external CoreELEC/EmuELEC boot is needed before the eMMC CE/EE is bootable, the parts set is box-specific and newer boxes need more parts to
