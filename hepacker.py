@@ -48,6 +48,10 @@ class Building:
             print(f"- {path}")
             path.unlink()
 
+    def check_encrypt(self):
+        if self.everything().joinpath("meson1_ENC.dtb").exists():
+            raise ValueError("Image contains encrypted DTB partition meson1_ENC.dtb, it's impossible to modify partition layout")
+
 def upper_megabyte(size: int) -> int:
     return (size + 0xfffff) // 0x100000 * 0x100000
 
@@ -324,6 +328,7 @@ def main():
     shutil.rmtree(building.building, True)
     everything = building.everything()
     subprocess.run(("ampack", "unpack", args.android, everything), check = True)
+    building.check_encrypt()
     if args.keep is not None:
         building.keep(args.keep)
     if ce_options is not None:
