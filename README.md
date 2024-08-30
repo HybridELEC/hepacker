@@ -73,3 +73,53 @@ Examples:
   ````
   python hepacker.py --android ~/Downloads/aml_upgrade_package_senk.img --ee-tar ~/Downloads/EmuELEC-Amlogic-ng.aarch64-4.7.tar --ee-dtb g12a_s905x2_4g --ee-storage 4G --output a95x_f2_hybrid_AE.img
   ````
+
+The image needs to be burnt to eMMC via Amlogic USB Burning Tool, on a Windows host. Check how to flash Android image for your box and everything goes similarly.
+
+## Alternative usage
+
+It's also possible to use the building artifacts (partitions) on a running box. This won't be a step-by-step guide as every box works differently, I would only cover main ideas.
+
+- Make sure you have a working stock Android image.
+- Make an image containing your expected CE and EE layout (e.g. if you want CoreELEC + EmuELEC, then make an Android + CoreELEC + EmuELEC one), make sure you have `building/everything/ce_system.PARTITION` and `building/everything/ee_system.PARTITION`
+- Boot to an official external CoreELEC or EmuELEC
+- Build, or download an already built staticly linked ARM binary for https://github.com/7Ji/ampart
+- Transfer ampart to your external system
+- Run ampart webreport mode and keep the link, so you can latter restore the snapshots
+- Also run ampart dsnapshot mode and esnapshot mode and keep the human-readable snaphsots
+- If you do not want to keep Android:
+  - Use `dedit` mode with `--migrate all` to drop Android partitions one by one until the box does not boot, for every boot keep a `dsnapshot`.
+  - Use `dclone` mode with `--migrate all` to restore the box to the last working `dsnapshot` after you re-flashing the Android and keep on trying.
+  - Every box is different so be patient. 
+  - Alternatively, you could try to `dclone` a `data::-1:4` snapshot, which means to only keep a data partition that takes all space, however newer boxes require more partitions to boot and this would mostly break the box.
+  - You should now have the minimum number of partitions, take a dsnapshot.
+  - For a few boxes that would not break without a sane DTB partitions info, you can use `e-` modes, including `ecreate`, for maximum space utilization.
+- If you want to keep Android:
+  - Back up your Android data partition
+- Adapt your dsnapshot: add `[prefix]_system::[size of your ce_system.PARTITION]:2`, e.g. `ce_system::234M:2`,  as needed, before the first partitions (so they would be first, and second if you have two), then add `[prefix]_storage::[size you want for storage]:4`as needed, at the end
+  - If you don't want Android, the last storage should have a size of `-1` to take all space, the 2nd last should have an exact size, and both as the last 2.
+  - If you keep Android, your storage partitions should be 2nd last and 3rd last, and the Android data partition should keep its size `-1`
+- Apply your new dnspashot with `dclone` mode with `--migrate all`
+- Reboot the box to ensure it still boots to your external system, and to let the kernel recognize new partitions.
+- Restore your Android data partition if needed.
+- Use `dd` to clone your `[prefix]_system.PARTITION` into corresponding `/dev/[prefix]_system`
+- Run `mkfs.ext4 -m 0` on your `/dev/[prefix]_storage`
+- The box should now be able to boot to the first eMMC `_system` partition, to boot to the second you would need https://github.com/HybridELEC/hybrid_android_helper
+
+## License
+**HEpacker**, a tool to create HybridELEC Android + CE + EE 3in1 burning image
+
+Copyright (C) 2024-present Guoxin "7Ji" Pu
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
