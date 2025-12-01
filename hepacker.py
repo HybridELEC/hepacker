@@ -274,7 +274,61 @@ class AmpartTable:
                 raise Exception("Too many partitions")
         self.partitions = partitions
 
-def hack_recovery(building: Building):
+@dataclass
+class GptPartition:
+    name: str
+    size: int
+    masks: int
+
+    @classmethod
+    def from_line(cls, line: str):
+        parts = line.split(",")
+        if len(parts) != 3:
+            raise ValueError("Splitted parg length is not 4")
+        if parts[1] == "-":
+            size = -1
+        else:
+            size = int(parts[1]) << 20
+        return cls(parts[0], size, int(parts[2], 16))
+
+@dataclass
+class GptTable:
+    partitions: list[GptPartition]
+    count: int
+
+    @classmethod
+    def from_csv(cls, csv: pathlib.Path):
+        with csv.open("r") as f:
+            content = f.read()
+        partitions = [GptPartition.from_line(line) for line in content.splitlines()[1:]]
+        return cls(partitions, len(partitions))
+
+    def update(self, ce_options: SubsystemOptions, ee_options: SubsystemOptions):
+        partitions = []
+        if ce_options is not None:
+            partitions.append(GptPartition("ce_system", ce_options.system, 0x1000000000000))
+        if ee_options is not None:
+            partitions.append(GptPartition("ee_system", ee_options.system, 0x1000000000000))
+        partitions.extend(self.partitions[:-1])
+        if ce_options is not None:
+            partitions.append(GptPartition("ce_storage", ce_options.storage, 0x1004000000000000))
+        if ee_options is not None:
+            partitions.append(GptPartition("ee_storage", ee_options.storage, 0x1004000000000000))
+        partitions.append(self.partitions[-1])
+        self.partitions = partitions
+
+    def to_csv(self, csv: pathlib.Path):
+        parts = ["name,size_mb,flagx"]
+        for partition in self.partitions:
+            if partition.size <= 0:
+                parts.append(f"{partition.name},-,{partition.masks:x}")
+            else:
+                parts.append(f"{partition.name},{partition.size >> 20},{partition.masks:x}")
+        content = "\n".join(parts).encode("utf-8")
+        with csv.open("wb") as f:
+            f.write(content)
+
+def hack_recovery(building: Building, offset: int = 2):
     recovery_partition = building.everything().joinpath("recovery.PARTITION")
     if not recovery_partition.exists():
         return
@@ -291,7 +345,7 @@ def hack_recovery(building: Building):
             continue
         elif part.startswith(b'root=/dev/mmcblk0p'):
             part_id = int(part[18:])
-            part = f"root=/dev/mmcblk0p{part_id + 2}".encode('utf-8')
+            part = f"root=/dev/mmcblk0p{part_id + offset}".encode('utf-8')
         cmdline_parts.append(part)
     cmdline = b' '.join(cmdline_parts)
     cmdline += b'\0' * (0x200 - len(cmdline))
@@ -335,20 +389,34 @@ def main():
         building.check_encrypt()
     if args.keep is not None:
         building.keep(args.keep)
+    offset = 0
     if ce_options is not None:
         ce_options.build("ce", building)
+        offset += 1
     if ee_options is not None:
         ee_options.build("ee", building)
-    hack_recovery(building)
+        offset += 1
+    hack_recovery(building, offset)
     dtb = everything.joinpath("meson1.dtb")
-    r = subprocess.run(("ampart", "--mode", "dsnapshot", dtb), check = True, stdout = subprocess.PIPE)
-    table = AmpartTable.from_line(r.stdout.decode("utf-8").split("\n")[0])
-    table.update(ce_options, ee_options)
-    subprocess.run(("ampart", "--mode", "dclone", dtb, *(f"{partition.name}::{partition.size}:{partition.masks}" for partition in table.partitions)))
+    gpt_bin = everything.joinpath("gpt.bin")
+    is_gpt = gpt_bin.is_file()
+    if is_gpt:
+        csv = building.building.joinpath("parts.csv")
+        subprocess.run(("gpt-unbin", "dump", gpt_bin, csv), check = True)
+        table = GptTable.from_csv(csv)
+        table.update(ce_options, ee_options)
+        table.to_csv(csv)
+        subprocess.run(("gpt-unbin", "apply", gpt_bin, csv), check = True)
+    else:
+        r = subprocess.run(("ampart", "--mode", "dsnapshot", dtb), check = True, stdout = subprocess.PIPE)
+        table = AmpartTable.from_line(r.stdout.decode("utf-8").split("\n")[0])
+        table.update(ce_options, ee_options)
+        subprocess.run(("ampart", "--mode", "dclone", dtb, *(f"{partition.name}::{partition.size}:{partition.masks}" for partition in table.partitions)))
     if args.fake_emmc is None:
-        dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
-        if dtb_dup.exists():
-            shutil.copyfile(dtb, dtb_dup)
+        if not is_gpt:
+            dtb_dup = everything.joinpath("_aml_dtb.PARTITION")
+            if dtb_dup.exists():
+                shutil.copyfile(dtb, dtb_dup)
         if everything.joinpath("super.PARTITION").exists() and any(True for _ in everything.glob("*_a.PARTITION")):
             pack_args = ("ampack", "pack", "--out-align", "8", everything, args.output)
         else:

@@ -11,7 +11,8 @@ The platform on which this tool is developed and tested is Arch Linux.
 
 This tool expects the following tool & binaries to exist in `PATH` and being the latest version. 
 
-- `ampart`: from https://github.com/7Ji/ampart , for modifying the partition table in DTB
+- `ampart`: from https://github.com/7Ji/ampart , for modifying the partition table in DTB, for SoCs until SC2 family, e.g. S905X4
+- `gpt-unbin`: from https://github.com/7Ji/gpt-unbin , for modifying the partition table in `gpt.bin` in image, for SoCs since S7D familcy, e.g. S905X5
 - `ampack`: from https://github.com/7Ji/ampack , for unpacking and repacking burning image
 - `mkimage`: provided by `uboot-tools`, for creating uboot script
 - `mkfs.vfat`: provided by `dosfstools`, for creating fat32 filesystems for `ce_system` and `ee_system`
