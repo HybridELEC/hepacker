@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-import os
 import sys
 import tarfile
 import hashlib
@@ -63,7 +62,7 @@ def allocate_file(path: pathlib.Path, size: int):
 class UpgradeTar:
     def __init__(self, name: str, path: str, dtb: str):
         tar = tarfile.TarFile(path, 'r', format = tarfile.GNU_FORMAT)
-        prefix = tar.members[0].name
+        prefix = tar.members[0].name # type: ignore
         target = f"{prefix}/target"
         bootloader = f"{prefix}/3rdparty/bootloader"
         self.info = UpgradeTarInfo(
@@ -75,18 +74,18 @@ class UpgradeTar:
             tar.getmember(f"{bootloader}/Generic_cfgload"),
             tar.getmember(f"{bootloader}/config.ini")
         )
-        kernel = tar.extractfile(self.info.kernel).read()
-        kernel_md5 = bytes.fromhex(tar.extractfile(self.info.kernel_md5).read()[0:32].decode('utf-8'))
+        kernel = tar.extractfile(self.info.kernel).read() # type: ignore
+        kernel_md5 = bytes.fromhex(tar.extractfile(self.info.kernel_md5).read()[0:32].decode('utf-8')) # type: ignore
         verify_md5(kernel, kernel_md5)
-        system = tar.extractfile(self.info.system).read()
-        system_md5 = bytes.fromhex(tar.extractfile(self.info.system_md5).read()[0:32].decode('utf-8'))
+        system = tar.extractfile(self.info.system).read() # type: ignore
+        system_md5 = bytes.fromhex(tar.extractfile(self.info.system_md5).read()[0:32].decode('utf-8')) # type: ignore
         verify_md5(system, system_md5)
         self.data = UpgradeTarData(
             kernel,
             system,
-            tar.extractfile(self.info.dtb).read(),
-            tar.extractfile(self.info.cfgload).read(),
-            tar.extractfile(self.info.config).read()
+            tar.extractfile(self.info.dtb).read(), # type: ignore
+            tar.extractfile(self.info.cfgload).read(), # type: ignore
+            tar.extractfile(self.info.config).read() # type: ignore
         )
         self.tar = tar
         self.name = name
@@ -180,7 +179,7 @@ class UpgradeTar:
         storage_raw.unlink()
         return storage_size
 
-    def build(self, building: Building, system_dynamic: bool, system_size: int, storage_size: int) -> (int, int):
+    def build(self, building: Building, system_dynamic: bool, system_size: int, storage_size: int) -> tuple[int, int]:
         return (
             self.build_system(building, system_dynamic, system_size),
             self.build_storage(building, storage_size)
